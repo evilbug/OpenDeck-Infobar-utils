@@ -37,7 +37,7 @@
 			"States": [{ "Image": "actionDefaultImage" }],
 			"Controllers": ["Infobar"],
 			"SupportedInMultiActions": false,
-			"Tooltip": "Display Claude API usage statistics",
+			"Tooltip": "Show Claude subscription usage (5h / 7d windows, like /usage)",
 			"UUID": "com.evilbug.infobarclock.claude",
 			"PropertyInspectorPath": "propertyInspector/claude.html"
 		}

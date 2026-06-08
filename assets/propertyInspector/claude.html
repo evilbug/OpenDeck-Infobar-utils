@@ -14,17 +14,23 @@
 					}));
 				};
 
-				const apiKey = document.getElementById("apiKey");
-				apiKey.value = inActionInfo.payload.settings.api_key ?? "";
-				apiKey.type = "password";
+				const settings = inActionInfo.payload.settings ?? {};
+				const refresh = document.getElementById("refresh");
+				const credentials = document.getElementById("credentials");
+
+				refresh.value = settings.refresh_secs ?? 300;
+				credentials.value = settings.credentials_path ?? "";
 
 				update = () => {
+					const payload = {};
+					const secs = parseInt(refresh.value, 10);
+					if (!Number.isNaN(secs)) payload.refresh_secs = secs;
+					if (credentials.value.trim() !== "") payload.credentials_path = credentials.value.trim();
+
 					websocket.send(JSON.stringify({
 						event: "setSettings",
 						context: inActionInfo.context,
-						payload: {
-							api_key: apiKey.value,
-						},
+						payload,
 					}));
 				};
 			}
@@ -33,13 +39,24 @@
 	</head>
 	<body>
 		<div class="sdpi-item">
-			<div class="sdpi-item-label">Claude API Key</div>
-			<input id="apiKey" oninput="update()" class="sdpi-item-value" placeholder="sk-ant-..." type="password" />
+			<div class="sdpi-item-label">Refresh (s)</div>
+			<input id="refresh" oninput="update()" class="sdpi-item-value" type="number" min="180" step="60" value="300" />
+		</div>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label">Credentials</div>
+			<input id="credentials" oninput="update()" class="sdpi-item-value" placeholder="~/.claude/.credentials.json (auto)" type="text" />
 		</div>
 		<div class="sdpi-item">
 			<div class="sdpi-item-label">Info</div>
 			<div class="sdpi-item-value">
-				<small>Enter your Anthropic API key to monitor Claude usage. The key is stored locally in your profile settings.</small>
+				<small>
+					Shows your Claude subscription usage (the same 5-hour and 7-day
+					windows as <code>/usage</code>). It reads the OAuth token that
+					Claude Code stores locally — no API key needed and no tokens are
+					spent. Just sign in with the Claude CLI. Minimum refresh is 180s to
+					avoid rate limiting. Leave Credentials blank unless your token lives
+					somewhere other than the default path.
+				</small>
 			</div>
 		</div>
 	</body>

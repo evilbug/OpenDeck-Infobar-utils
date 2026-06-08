@@ -1,5 +1,6 @@
 [package]
 name = "opendeck-infobar-utils"
+version = "1.0.0"
 authors = ["evilbug"]
 license = "GPL-3.0-or-later"
 edition = "2024"
@@ -11,7 +12,7 @@ simplelog = "0.12"
 serde = "1.0"
 serde_json = "1.0"
 tokio = { version = "1.48", features = ["full"] }
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 imageproc = { version = "0.26", default-features = false, features = ["text"] }
 ab_glyph = "0.2"

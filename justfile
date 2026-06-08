@@ -38,15 +38,17 @@ package-all: build-linux build-mac build-win collect-all zip
 collect:
     rm -rf build
     mkdir -p build/{{id}}
-    cp -r assets build/{{id}}
-    cp assets/manifest.json build/{{id}}
+    cp assets/manifest.json build/{{id}}/
+    cp -r assets/icons build/{{id}}/
+    cp -r assets/propertyInspector build/{{id}}/
     cp target/plugin-linux/x86_64-unknown-linux-gnu/release/opendeck-infobar-utils build/{{id}}/opendeck-infobar-utils-linux
 
 collect-all:
     rm -rf build
     mkdir -p build/{{id}}
-    cp -r assets build/{{id}}
-    cp assets/manifest.json build/{{id}}
+    cp assets/manifest.json build/{{id}}/
+    cp -r assets/icons build/{{id}}/
+    cp -r assets/propertyInspector build/{{id}}/
     cp target/plugin-linux/x86_64-unknown-linux-gnu/release/opendeck-infobar-utils build/{{id}}/opendeck-infobar-utils-linux
     cp target/plugin-mac/universal2-apple-darwin/release/opendeck-infobar-utils build/{{id}}/opendeck-infobar-utils-mac
     cp target/plugin-win/x86_64-pc-windows-gnu/release/opendeck-infobar-utils.exe build/{{id}}/opendeck-infobar-utils-win.exe
