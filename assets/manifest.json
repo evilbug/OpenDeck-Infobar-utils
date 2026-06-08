@@ -1,0 +1,42 @@
+{
+	"Name": "OpenDeck Infobar Clock",
+	"Description": "Clock action for Stream Deck infobar screens",
+	"Author": "evilbug",
+	"Version": "1.0.0",
+	"CodePaths": {
+		"x86_64-pc-windows-msvc": "x86_64-pc-windows-msvc/bin/opendeck-infobar-clock.exe",
+		"x86_64-apple-darwin": "x86_64-apple-darwin/bin/opendeck-infobar-clock",
+		"aarch64-apple-darwin": "aarch64-apple-darwin/bin/opendeck-infobar-clock",
+		"x86_64-unknown-linux-gnu": "x86_64-unknown-linux-gnu/bin/opendeck-infobar-clock",
+		"aarch64-unknown-linux-gnu": "aarch64-unknown-linux-gnu/bin/opendeck-infobar-clock"
+	},
+	"CodePathWin": "x86_64-pc-windows-msvc/bin/opendeck-infobar-clock.exe",
+	"CodePathMac": "x86_64-apple-darwin/bin/opendeck-infobar-clock",
+	"CodePathLin": "x86_64-unknown-linux-gnu/bin/opendeck-infobar-clock",
+	"Icon": "icons/clock",
+	"Category": "OpenDeck",
+	"OS": [
+		{
+			"Platform": "mac",
+			"MinimumVersion": "10.11"
+		},
+		{
+			"Platform": "windows",
+			"MinimumVersion": "10"
+		},
+		{
+			"Platform": "linux"
+		}
+	],
+	"Actions": [
+		{
+			"Icon": "icons/clock",
+			"Name": "Infobar Clock",
+			"States": [{ "Image": "actionDefaultImage" }],
+			"Controllers": ["Infobar"],
+			"SupportedInMultiActions": false,
+			"Tooltip": "Display time and date on the infobar",
+			"UUID": "com.evilbug.infobarclock.clock"
+		}
+	]
+}
