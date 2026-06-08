@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<script>
+			let update = () => {};
+
+			function connectElgatoStreamDeckSocket(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inActionInfo) {
+				const websocket = new WebSocket("ws://localhost:" + inPort);
+				inActionInfo = JSON.parse(inActionInfo);
+				websocket.onopen = () => {
+					websocket.send(JSON.stringify({
+						event: inRegisterEvent,
+						uuid: inPropertyInspectorUUID,
+					}));
+				};
+
+				const apiKey = document.getElementById("apiKey");
+				apiKey.value = inActionInfo.payload.settings.api_key ?? "";
+				apiKey.type = "password";
+
+				update = () => {
+					websocket.send(JSON.stringify({
+						event: "setSettings",
+						context: inActionInfo.context,
+						payload: {
+							api_key: apiKey.value,
+						},
+					}));
+				};
+			}
+		</script>
+		<link rel="stylesheet" href="sdpi.css" />
+	</head>
+	<body>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label">Claude API Key</div>
+			<input id="apiKey" oninput="update()" class="sdpi-item-value" placeholder="sk-ant-..." type="password" />
+		</div>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label">Info</div>
+			<div class="sdpi-item-value">
+				<small>Enter your Anthropic API key to monitor Claude usage. The key is stored locally in your profile settings.</small>
+			</div>
+		</div>
+	</body>
+</html>
