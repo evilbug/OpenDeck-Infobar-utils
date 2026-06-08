@@ -1,5 +1,5 @@
 [package]
-name = "opendeck-infobar-clock"
+name = "opendeck-infobar-utils"
 authors = ["evilbug"]
 license = "GPL-3.0-or-later"
 edition = "2024"

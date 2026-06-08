@@ -4,15 +4,15 @@
 	"Author": "evilbug",
 	"Version": "1.0.0",
 	"CodePaths": {
-		"x86_64-pc-windows-msvc": "x86_64-pc-windows-msvc/bin/opendeck-infobar-clock.exe",
-		"x86_64-apple-darwin": "x86_64-apple-darwin/bin/opendeck-infobar-clock",
-		"aarch64-apple-darwin": "aarch64-apple-darwin/bin/opendeck-infobar-clock",
-		"x86_64-unknown-linux-gnu": "x86_64-unknown-linux-gnu/bin/opendeck-infobar-clock",
-		"aarch64-unknown-linux-gnu": "aarch64-unknown-linux-gnu/bin/opendeck-infobar-clock"
+		"x86_64-pc-windows-msvc": "x86_64-pc-windows-msvc/bin/opendeck-infobar-utils.exe",
+		"x86_64-apple-darwin": "x86_64-apple-darwin/bin/opendeck-infobar-utils",
+		"aarch64-apple-darwin": "aarch64-apple-darwin/bin/opendeck-infobar-utils",
+		"x86_64-unknown-linux-gnu": "x86_64-unknown-linux-gnu/bin/opendeck-infobar-utils",
+		"aarch64-unknown-linux-gnu": "aarch64-unknown-linux-gnu/bin/opendeck-infobar-utils"
 	},
-	"CodePathWin": "x86_64-pc-windows-msvc/bin/opendeck-infobar-clock.exe",
-	"CodePathMac": "x86_64-apple-darwin/bin/opendeck-infobar-clock",
-	"CodePathLin": "x86_64-unknown-linux-gnu/bin/opendeck-infobar-clock",
+	"CodePathWin": "x86_64-pc-windows-msvc/bin/opendeck-infobar-utils.exe",
+	"CodePathMac": "x86_64-apple-darwin/bin/opendeck-infobar-utils",
+	"CodePathLin": "x86_64-unknown-linux-gnu/bin/opendeck-infobar-utils",
 	"Icon": "icons/clock",
 	"Category": "OpenDeck",
 	"OS": [
