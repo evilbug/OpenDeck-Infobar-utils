@@ -3,16 +3,9 @@
 	"Description": "Clock action for Stream Deck infobar screens",
 	"Author": "evilbug",
 	"Version": "1.0.0",
-	"CodePaths": {
-		"x86_64-pc-windows-msvc": "x86_64-pc-windows-msvc/bin/opendeck-infobar-utils.exe",
-		"x86_64-apple-darwin": "x86_64-apple-darwin/bin/opendeck-infobar-utils",
-		"aarch64-apple-darwin": "aarch64-apple-darwin/bin/opendeck-infobar-utils",
-		"x86_64-unknown-linux-gnu": "x86_64-unknown-linux-gnu/bin/opendeck-infobar-utils",
-		"aarch64-unknown-linux-gnu": "aarch64-unknown-linux-gnu/bin/opendeck-infobar-utils"
-	},
-	"CodePathWin": "x86_64-pc-windows-msvc/bin/opendeck-infobar-utils.exe",
-	"CodePathMac": "x86_64-apple-darwin/bin/opendeck-infobar-utils",
-	"CodePathLin": "x86_64-unknown-linux-gnu/bin/opendeck-infobar-utils",
+	"CodePathLin": "opendeck-infobar-utils-linux",
+	"CodePathMac": "opendeck-infobar-utils-mac",
+	"CodePathWin": "opendeck-infobar-utils-win.exe",
 	"Icon": "icons/clock",
 	"Category": "OpenDeck",
 	"OS": [
