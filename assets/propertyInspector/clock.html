@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<script>
+			let update = () => {};
+
+			function connectElgatoStreamDeckSocket(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inActionInfo) {
+				const websocket = new WebSocket("ws://localhost:" + inPort);
+				inActionInfo = JSON.parse(inActionInfo);
+				websocket.onopen = () => {
+					websocket.send(JSON.stringify({
+						event: inRegisterEvent,
+						uuid: inPropertyInspectorUUID,
+					}));
+				};
+
+				const settings = inActionInfo.payload.settings ?? {};
+				const format = document.getElementById("format");
+				format.value = (settings.use_12h ?? false) ? "12h" : "24h";
+
+				update = () => {
+					websocket.send(JSON.stringify({
+						event: "setSettings",
+						context: inActionInfo.context,
+						payload: {
+							use_12h: format.value === "12h",
+						},
+					}));
+				};
+			}
+		</script>
+		<link rel="stylesheet" href="sdpi.css" />
+	</head>
+	<body>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label">Time Format</div>
+			<select id="format" onchange="update()" class="sdpi-item-value select">
+				<option value="24h">24-hour (14:30:00)</option>
+				<option value="12h">12-hour (2:30 PM)</option>
+			</select>
+		</div>
+	</body>
+</html>
