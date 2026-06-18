@@ -3,13 +3,14 @@
 //! Two flavors — [`ClaudeDailyUsageAction`] (the rolling 5-hour window) and
 //! [`ClaudeWeeklyUsageAction`] (the rolling 7-day window) — share everything
 //! but which window they read and the unit of the reset countdown. Each key
-//! shows a donut whose fill is the utilization %, the time left until that
-//! window resets in the center, and an optional user-supplied title beneath.
+//! shows a donut whose fill is the utilization % and the time left until that
+//! window resets in the center. The key caption is left to the host's native
+//! title overlay. An optional alert color takes over past a load threshold.
 //!
 //! The actual API/credentials handling lives in [`crate::claude`].
 
 use crate::claude::{self, FetchError, UsageReport, Window};
-use crate::render::{Canvas, DIM, WHITE, parse_hex_color, usage_color};
+use crate::render::{Canvas, DIM, WHITE, parse_hex_color};
 use crate::tasks;
 use image::Rgba;
 use openaction::*;
@@ -23,10 +24,40 @@ pub struct ClaudeKeyUsageSettings {
 	refresh_secs: Option<u64>,
 	/// Override for the credentials file (defaults to `~/.claude/.credentials.json`).
 	credentials_path: Option<String>,
-	/// `#RRGGBB` fill color for the arc. Empty/invalid → green/amber/red by load.
+	/// `#RRGGBB` fill color for the arc (defaults to green).
 	color: Option<String>,
-	/// Optional caption drawn under the gauge (e.g. "DÍA" / "SEMANA").
-	title: Option<String>,
+	/// `#RRGGBB` alert color used once `alert_threshold` is reached (defaults to red).
+	alert_color: Option<String>,
+	/// Utilization % at which the alert color kicks in (defaults to 75; set 100 to
+	/// effectively disable it).
+	alert_threshold: Option<f32>,
+}
+
+/// Default arc color when none is configured (matches the green in `usage_color`).
+const DEFAULT_COLOR: Rgba<u8> = Rgba([55, 200, 110, 255]);
+/// Default alert color (matches the red in `usage_color`).
+const DEFAULT_ALERT_COLOR: Rgba<u8> = Rgba([235, 60, 45, 255]);
+const DEFAULT_ALERT_THRESHOLD: f32 = 75.0;
+
+/// Resolved drawing style for one frame.
+#[derive(Clone, Copy)]
+struct Style {
+	/// Base fill color.
+	color: Rgba<u8>,
+	/// Alert fill that overrides `color` at/above `threshold`, if set.
+	alert: Option<Rgba<u8>>,
+	threshold: f32,
+}
+
+impl Style {
+	/// The arc color for a given utilization: the alert color past the
+	/// threshold, otherwise the base color.
+	fn fill(&self, percent: f32) -> Rgba<u8> {
+		match self.alert {
+			Some(alert) if percent >= self.threshold => alert,
+			_ => self.color,
+		}
+	}
 }
 
 impl ClaudeKeyUsageSettings {
@@ -38,13 +69,12 @@ impl ClaudeKeyUsageSettings {
 		self.credentials_path.clone().unwrap_or_else(claude::default_credentials_path)
 	}
 
-	/// The configured fill color, if it parses as a hex color.
-	fn color(&self) -> Option<Rgba<u8>> {
-		self.color.as_deref().and_then(parse_hex_color)
-	}
-
-	fn title(&self) -> String {
-		self.title.clone().unwrap_or_default().trim().to_string()
+	fn style(&self) -> Style {
+		Style {
+			color: self.color.as_deref().and_then(parse_hex_color).unwrap_or(DEFAULT_COLOR),
+			alert: Some(self.alert_color.as_deref().and_then(parse_hex_color).unwrap_or(DEFAULT_ALERT_COLOR)),
+			threshold: self.alert_threshold.unwrap_or(DEFAULT_ALERT_THRESHOLD),
+		}
 	}
 }
 
@@ -84,19 +114,16 @@ impl WindowKind {
 /// Square key resolution. The Stream Deck scales this down to the physical key.
 const SIZE: u32 = 144;
 
-/// Draw the gauge key: a donut filled to `percent`, `center` text inside it,
-/// and an optional `title` underneath.
-fn render_gauge(percent: f32, has_data: bool, center: &str, color: Option<Rgba<u8>>, title: &str) -> Result<String, String> {
+/// Draw the gauge key: a donut filled to `percent` with `center` text inside
+/// it. The caption is handled by the host's native key title, not drawn here.
+fn render_gauge(percent: f32, has_data: bool, center: &str, fill: Rgba<u8>) -> Result<String, String> {
 	let mut canvas = Canvas::with_size(SIZE, SIZE);
 
 	let cx = SIZE as f32 / 2.0;
-	let has_title = !title.is_empty();
-	// Nudge the donut up when a caption needs room at the bottom.
-	let cy = if has_title { 64.0 } else { 72.0 };
+	let cy = SIZE as f32 / 2.0;
 	let r_outer = 62.0;
 	let r_inner = 49.0;
 
-	let fill = color.unwrap_or_else(|| usage_color(percent));
 	canvas.gauge(cx, cy, r_outer, r_inner, percent / 100.0, fill);
 
 	// Center: time-to-reset, or "--" when the window/data is unavailable.
@@ -104,10 +131,6 @@ fn render_gauge(percent: f32, has_data: bool, center: &str, color: Option<Rgba<u
 	let size = if label.chars().count() >= 4 { 36.0 } else { 46.0 };
 	let top = (cy - size * 0.5).round() as i32;
 	canvas.text_centered(cx as i32, top, size, WHITE, label);
-
-	if has_title {
-		canvas.text_centered(cx as i32, 116, 24.0, DIM, title);
-	}
 
 	canvas.to_data_uri()
 }
@@ -121,13 +144,13 @@ fn render_message(title: &str, detail: &str) -> Result<String, String> {
 }
 
 /// Produce the next frame for one window kind. `Err` keeps the previous frame.
-async fn render_frame(kind: WindowKind, path: &str, color: Option<Rgba<u8>>, title: &str) -> Result<String, String> {
+async fn render_frame(kind: WindowKind, path: &str, style: &Style) -> Result<String, String> {
 	match claude::fetch_usage(path).await {
 		Ok(report) => {
 			let window = kind.select(&report);
 			let percent = window.map(|w| w.utilization).unwrap_or(0.0);
 			let center = window.map(|w| kind.reset_label(w)).unwrap_or_default();
-			render_gauge(percent, window.is_some(), &center, color, title)
+			render_gauge(percent, window.is_some(), &center, style.fill(percent))
 		}
 		Err(FetchError::NoAuth(hint)) => render_message("Claude", &hint),
 		Err(FetchError::Unauthorized) => render_message("Claude", "auth expired"),
@@ -141,19 +164,18 @@ async fn render_frame(kind: WindowKind, path: &str, color: Option<Rgba<u8>>, tit
 
 fn start(kind: WindowKind, instance: &Instance, settings: &ClaudeKeyUsageSettings) {
 	let path = settings.credentials_path();
-	let color = settings.color();
-	let title = settings.title();
+	let style = settings.style();
 	tasks::start(instance.instance_id.clone(), settings.interval(), move || {
-		let (path, title) = (path.clone(), title.clone());
-		async move { render_frame(kind, &path, color, &title).await }
+		let path = path.clone();
+		async move { render_frame(kind, &path, &style).await }
 	});
 }
 
 async fn manual_refresh(kind: WindowKind, instance: &Instance, settings: &ClaudeKeyUsageSettings) {
 	let path = settings.credentials_path();
-	let (color, title) = (settings.color(), settings.title());
+	let style = settings.style();
 	if let Some(inst) = openaction::get_instance(instance.instance_id.clone()).await {
-		match render_frame(kind, &path, color, &title).await {
+		match render_frame(kind, &path, &style).await {
 			Ok(image) => {
 				let _ = inst.set_image(Some(image), None).await;
 			}
@@ -219,15 +241,40 @@ mod tests {
 
 	#[test]
 	fn renders_a_valid_png_data_uri() {
-		let uri = render_gauge(55.0, true, "2d", Some(Rgba([10, 132, 255, 255])), "SEMANA").expect("renders");
+		let uri = render_gauge(55.0, true, "2d", Rgba([10, 132, 255, 255])).expect("renders");
 		assert!(uri.starts_with("data:image/png;base64,"));
 		assert!(uri.len() > 100);
 	}
 
 	#[test]
-	fn renders_without_data_or_title() {
-		let uri = render_gauge(0.0, false, "", None, "").expect("renders");
+	fn renders_without_data() {
+		let uri = render_gauge(0.0, false, "", DEFAULT_COLOR).expect("renders");
 		assert!(uri.starts_with("data:image/png;base64,"));
+	}
+
+	#[test]
+	fn alert_color_overrides_past_threshold() {
+		let base = Rgba([10, 132, 255, 255]);
+		let alert = Rgba([235, 60, 45, 255]);
+		let style = Style { color: base, alert: Some(alert), threshold: 75.0 };
+		assert_eq!(style.fill(50.0), base, "below threshold keeps the base color");
+		assert_eq!(style.fill(75.0), alert, "at the threshold switches to alert");
+		assert_eq!(style.fill(90.0), alert, "above threshold stays on alert");
+
+		// No alert color configured → always the base color.
+		let plain = Style { color: base, alert: None, threshold: 75.0 };
+		assert_eq!(plain.fill(99.0), base);
+	}
+
+	#[test]
+	fn style_uses_defaults_without_settings() {
+		let style = ClaudeKeyUsageSettings::default().style();
+		assert_eq!(style.color, DEFAULT_COLOR);
+		assert_eq!(style.alert, Some(DEFAULT_ALERT_COLOR));
+		assert_eq!(style.threshold, DEFAULT_ALERT_THRESHOLD);
+		// Defaults: green below 75%, red at/above.
+		assert_eq!(style.fill(74.0), DEFAULT_COLOR);
+		assert_eq!(style.fill(75.0), DEFAULT_ALERT_COLOR);
 	}
 
 	#[test]
@@ -246,11 +293,14 @@ mod tests {
 	#[test]
 	#[ignore = "writes preview PNGs to /tmp for visual inspection"]
 	fn write_preview() {
-		// Daily, low load, auto color, with title.
-		dump(&render_gauge(4.0, true, "5h", None, "DÍA").unwrap(), "/tmp/claude_key_daily.png");
-		// Weekly, mid load, custom blue, with title.
-		dump(&render_gauge(55.0, true, "2d", Some(Rgba([10, 132, 255, 255])), "SEMANA").unwrap(), "/tmp/claude_key_weekly.png");
-		// High load (auto → red), no title.
-		dump(&render_gauge(96.0, true, "1h", None, "").unwrap(), "/tmp/claude_key_full.png");
+		let green = DEFAULT_COLOR;
+		let red = Rgba([235, 60, 45, 255]);
+		let style = Style { color: green, alert: Some(red), threshold: 75.0 };
+		// Low load → base green.
+		dump(&render_gauge(4.0, true, "5h", style.fill(4.0)).unwrap(), "/tmp/claude_key_daily.png");
+		// Mid load (still below threshold) → base green.
+		dump(&render_gauge(55.0, true, "2d", style.fill(55.0)).unwrap(), "/tmp/claude_key_weekly.png");
+		// High load (past threshold) → alert red.
+		dump(&render_gauge(96.0, true, "1h", style.fill(96.0)).unwrap(), "/tmp/claude_key_full.png");
 	}
 }

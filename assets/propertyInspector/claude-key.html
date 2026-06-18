@@ -11,22 +11,20 @@
 			function populate() {
 				el("refresh").value = settings.refresh_secs ?? 300;
 				el("credentials").value = settings.credentials_path ?? "";
-				const auto = !settings.color;
-				el("auto").checked = auto;
 				el("color").value = settings.color || "#37c86e";
-				el("color").disabled = auto;
-				el("title").value = settings.title ?? "";
+				el("alertColor").value = settings.alert_color || "#eb3c2d";
+				el("alertAt").value = settings.alert_threshold ?? 75;
 			}
 
 			function save() {
-				const auto = el("auto").checked;
-				el("color").disabled = auto;
 				const secs = parseInt(el("refresh").value, 10);
+				const at = parseInt(el("alertAt").value, 10);
 				settings = {
 					refresh_secs: Number.isNaN(secs) ? 300 : secs,
 					credentials_path: el("credentials").value.trim(),
-					color: auto ? "" : el("color").value,
-					title: el("title").value,
+					color: el("color").value,
+					alert_color: el("alertColor").value,
+					alert_threshold: Number.isNaN(at) ? 75 : at,
 				};
 				if (websocket && websocket.readyState === 1) {
 					websocket.send(JSON.stringify({ event: "setSettings", context: piContext, payload: settings }));
@@ -68,16 +66,16 @@
 	</head>
 	<body>
 		<div class="sdpi-item">
-			<div class="sdpi-item-label">Title</div>
-			<input id="title" oninput="save()" class="sdpi-item-value" placeholder="optional, e.g. DÍA / SEMANA" type="text" maxlength="10" />
-		</div>
-		<div class="sdpi-item">
 			<div class="sdpi-item-label">Color</div>
 			<input id="color" oninput="save()" class="sdpi-item-value" type="color" value="#37c86e" />
 		</div>
 		<div class="sdpi-item">
-			<div class="sdpi-item-label">Auto color</div>
-			<input id="auto" onchange="save()" class="sdpi-item-value" type="checkbox" />
+			<div class="sdpi-item-label">Alert color</div>
+			<input id="alertColor" oninput="save()" class="sdpi-item-value" type="color" value="#eb3c2d" />
+		</div>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label">Alert at (%)</div>
+			<input id="alertAt" oninput="save()" class="sdpi-item-value" type="number" min="1" max="100" step="5" value="75" />
 		</div>
 		<div class="sdpi-item">
 			<div class="sdpi-item-label">Refresh (s)</div>
@@ -91,13 +89,14 @@
 			<div class="sdpi-item-label">Info</div>
 			<div class="sdpi-item-value">
 				<small>
-					Shows one Claude subscription window as a circular gauge: the arc
-					is how much of the window you've used, and the center is the time
-					left until it resets. Reads the OAuth token Claude Code stores
-					locally — no API key, no tokens spent. On Windows + WSL, point
-					Credentials at the WSL file via its UNC path. Pick any fill color,
-					or tick Auto color to color by load (green → amber → red). Minimum
-					refresh is 180s to avoid rate limiting.
+					Circular gauge for one Claude subscription window: the arc is how
+					much you've used, the center is the time left until it resets. Set
+					the key caption with the native <b>Title</b> field above. Pick the
+					fill color; the alert color takes over once usage passes the
+					threshold (set it to 100 to disable). Reads the OAuth token Claude Code
+					stores locally — no API key, no tokens spent. On Windows + WSL,
+					point Credentials at the WSL file via its UNC path. Minimum refresh
+					is 180s to avoid rate limiting.
 				</small>
 			</div>
 		</div>
