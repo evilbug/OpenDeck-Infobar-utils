@@ -29,7 +29,8 @@
 			"Controllers": ["Infobar"],
 			"SupportedInMultiActions": false,
 			"Tooltip": "Display time and date on the infobar",
-			"UUID": "com.evilbug.infobarclock.clock"
+			"UUID": "com.evilbug.infobarclock.clock",
+			"PropertyInspectorPath": "propertyInspector/clock.html"
 		},
 		{
 			"Icon": "icons/claude",
