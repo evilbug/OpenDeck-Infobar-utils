@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<script>
+			let update = () => {};
+
+			function connectElgatoStreamDeckSocket(inPort, inPropertyInspectorUUID, inRegisterEvent, inInfo, inActionInfo) {
+				const websocket = new WebSocket("ws://localhost:" + inPort);
+				inActionInfo = JSON.parse(inActionInfo);
+				websocket.onopen = () => {
+					websocket.send(JSON.stringify({
+						event: inRegisterEvent,
+						uuid: inPropertyInspectorUUID,
+					}));
+				};
+
+				const settings = inActionInfo.payload.settings ?? {};
+				const refresh = document.getElementById("refresh");
+				const credentials = document.getElementById("credentials");
+				const color = document.getElementById("color");
+				const auto = document.getElementById("auto");
+				const title = document.getElementById("title");
+
+				refresh.value = settings.refresh_secs ?? 300;
+				credentials.value = settings.credentials_path ?? "";
+				// An empty/absent color means "auto-color by load".
+				auto.checked = !settings.color;
+				color.value = settings.color || "#37c86e";
+				color.disabled = auto.checked;
+				title.value = settings.title ?? "";
+
+				update = () => {
+					color.disabled = auto.checked;
+					const payload = {};
+					const secs = parseInt(refresh.value, 10);
+					if (!Number.isNaN(secs)) payload.refresh_secs = secs;
+					if (credentials.value.trim() !== "") payload.credentials_path = credentials.value.trim();
+					payload.color = auto.checked ? "" : color.value;
+					payload.title = title.value;
+
+					websocket.send(JSON.stringify({
+						event: "setSettings",
+						context: inActionInfo.context,
+						payload,
+					}));
+				};
+			}
+		</script>
+		<link rel="stylesheet" href="sdpi.css" />
+	</head>
+	<body>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label">Title</div>
+			<input id="title" oninput="update()" class="sdpi-item-value" placeholder="optional, e.g. DÍA / SEMANA" type="text" maxlength="10" />
+		</div>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label">Color</div>
+			<input id="color" oninput="update()" class="sdpi-item-value" type="color" value="#37c86e" />
+		</div>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label">Auto color</div>
+			<input id="auto" onchange="update()" class="sdpi-item-value" type="checkbox" />
+		</div>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label">Refresh (s)</div>
+			<input id="refresh" oninput="update()" class="sdpi-item-value" type="number" min="180" step="60" value="300" />
+		</div>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label">Credentials</div>
+			<input id="credentials" oninput="update()" class="sdpi-item-value" placeholder="~/.claude/.credentials.json (auto)" type="text" />
+		</div>
+		<div class="sdpi-item">
+			<div class="sdpi-item-label">Info</div>
+			<div class="sdpi-item-value">
+				<small>
+					Shows one Claude subscription window as a circular gauge: the arc
+					is how much of the window you've used, and the center is the time
+					left until it resets. Reads the OAuth token Claude Code stores
+					locally — no API key, no tokens spent. Pick any fill color, or
+					clear it to auto-color by load (green → amber → red). Minimum
+					refresh is 180s to avoid rate limiting.
+				</small>
+			</div>
+		</div>
+	</body>
+</html>

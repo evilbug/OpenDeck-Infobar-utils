@@ -33,7 +33,12 @@ pub struct Canvas {
 impl Canvas {
 	/// Create a fresh black canvas at the infobar resolution.
 	pub fn new() -> Self {
-		let mut image = RgbaImage::new(WIDTH, HEIGHT);
+		Self::with_size(WIDTH, HEIGHT)
+	}
+
+	/// Create a fresh black canvas at an arbitrary size (e.g. a square keypad key).
+	pub fn with_size(width: u32, height: u32) -> Self {
+		let mut image = RgbaImage::new(width, height);
 		for pixel in image.pixels_mut() {
 			*pixel = Rgba([0, 0, 0, 255]);
 		}
@@ -67,9 +72,10 @@ impl Canvas {
 		let y0 = (cy - r_outer).floor() as i32;
 		let y1 = (cy + r_outer).ceil() as i32;
 
+		let (w, h) = (self.image.width(), self.image.height());
 		for py in y0..=y1 {
 			for px in x0..=x1 {
-				if px < 0 || py < 0 || px as u32 >= WIDTH || py as u32 >= HEIGHT {
+				if px < 0 || py < 0 || px as u32 >= w || py as u32 >= h {
 					continue;
 				}
 				let bg = *self.image.get_pixel(px as u32, py as u32);
@@ -131,6 +137,21 @@ pub fn text_width(text: &str, size: f32) -> i32 {
 		prev = Some(id);
 	}
 	width.ceil() as i32
+}
+
+/// Parse a `#RRGGBB` (or `RRGGBB`) hex string into an opaque color.
+///
+/// Returns `None` for anything that isn't exactly six hex digits, so callers can
+/// fall back to a default (e.g. the threshold-based [`usage_color`]).
+pub fn parse_hex_color(s: &str) -> Option<Rgba<u8>> {
+	let s = s.trim().trim_start_matches('#');
+	if s.len() != 6 || !s.is_ascii() {
+		return None;
+	}
+	let r = u8::from_str_radix(&s[0..2], 16).ok()?;
+	let g = u8::from_str_radix(&s[2..4], 16).ok()?;
+	let b = u8::from_str_radix(&s[4..6], 16).ok()?;
+	Some(Rgba([r, g, b, 255]))
 }
 
 /// Color for a utilization percentage: green / amber / red by threshold.

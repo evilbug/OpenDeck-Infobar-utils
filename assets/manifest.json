@@ -40,6 +40,26 @@
 			"Tooltip": "Show Claude subscription usage (5h / 7d windows, like /usage)",
 			"UUID": "com.evilbug.infobarclock.claude",
 			"PropertyInspectorPath": "propertyInspector/claude.html"
+		},
+		{
+			"Icon": "icons/claude",
+			"Name": "Claude Daily Usage",
+			"States": [{ "Image": "actionDefaultImage" }],
+			"Controllers": ["Keypad"],
+			"SupportedInMultiActions": false,
+			"Tooltip": "Claude 5-hour window as a circular gauge with time-to-reset",
+			"UUID": "com.evilbug.infobarclock.claude.daily",
+			"PropertyInspectorPath": "propertyInspector/claude-key.html"
+		},
+		{
+			"Icon": "icons/claude",
+			"Name": "Claude Weekly Usage",
+			"States": [{ "Image": "actionDefaultImage" }],
+			"Controllers": ["Keypad"],
+			"SupportedInMultiActions": false,
+			"Tooltip": "Claude 7-day window as a circular gauge with time-to-reset",
+			"UUID": "com.evilbug.infobarclock.claude.weekly",
+			"PropertyInspectorPath": "propertyInspector/claude-key.html"
 		}
 	]
 }

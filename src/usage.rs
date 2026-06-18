@@ -1,35 +1,15 @@
-//! Claude **subscription** usage monitor.
+//! Claude **subscription** usage monitor for the infobar.
 //!
-//! This shows the same data as Claude Code's `/usage` command: how much of your
-//! Pro/Max/Team plan you have consumed in the rolling 5-hour and 7-day windows.
-//!
-//! It reads the OAuth access token that Claude Code stores in
-//! `~/.claude/.credentials.json` and queries the undocumented endpoint
-//! `GET https://api.anthropic.com/api/oauth/usage` — the one that backs
-//! `/usage`. No API key is required, and (unlike the old implementation) it
-//! never spends any tokens: the endpoint only reports plan utilization.
-//!
-//! Notes on the endpoint, learned the hard way:
-//!   * A `User-Agent: claude-code/<version>` header is mandatory. Without it the
-//!     request lands in an aggressively rate-limited bucket and returns 429.
-//!   * It is safe to poll at ~180s intervals; we default to 300s because the
-//!     windows move slowly anyway.
-//!   * We re-read the credentials file every tick, so when Claude Code rotates
-//!     the access token we pick up the fresh one automatically instead of
-//!     trying (and racing) to refresh it ourselves.
+//! Draws both the 5-hour ("daily") and 7-day ("weekly") windows side by side on
+//! the infobar strip. The per-key gauges live in [`crate::usage_key`]; the
+//! shared API client lives in [`crate::claude`].
 
+use crate::claude::{self, FetchError, UsageReport, Window};
 use crate::render::{Canvas, DIM, WHITE, WIDTH, text_width, usage_color};
 use crate::tasks;
-use chrono::{DateTime, Utc};
 use openaction::*;
 use serde::{Deserialize, Serialize};
-use std::sync::OnceLock;
 use std::time::Duration;
-
-const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
-const USER_AGENT: &str = "claude-code/2.0.0";
-const DEFAULT_REFRESH_SECS: u64 = 300;
-const MIN_REFRESH_SECS: u64 = 180;
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 #[serde(default)]
@@ -42,114 +22,17 @@ pub struct ClaudeUsageSettings {
 
 impl ClaudeUsageSettings {
 	fn interval(&self) -> Duration {
-		Duration::from_secs(self.refresh_secs.unwrap_or(DEFAULT_REFRESH_SECS).max(MIN_REFRESH_SECS))
+		Duration::from_secs(self.refresh_secs.unwrap_or(claude::DEFAULT_REFRESH_SECS).max(claude::MIN_REFRESH_SECS))
 	}
 
 	fn credentials_path(&self) -> String {
-		self.credentials_path.clone().unwrap_or_else(default_credentials_path)
-	}
-}
-
-fn default_credentials_path() -> String {
-	let home = std::env::var("HOME").unwrap_or_default();
-	format!("{home}/.claude/.credentials.json")
-}
-
-// ---------------------------------------------------------------------------
-// Credentials & API types
-// ---------------------------------------------------------------------------
-
-#[derive(Deserialize)]
-struct CredentialsFile {
-	#[serde(rename = "claudeAiOauth")]
-	oauth: OauthCredentials,
-}
-
-#[derive(Deserialize)]
-struct OauthCredentials {
-	#[serde(rename = "accessToken")]
-	access_token: String,
-}
-
-/// One rolling usage window (e.g. the 5-hour or 7-day limit).
-#[derive(Deserialize)]
-struct Window {
-	utilization: f32,
-	resets_at: Option<DateTime<Utc>>,
-}
-
-#[derive(Deserialize)]
-struct UsageReport {
-	five_hour: Option<Window>,
-	seven_day: Option<Window>,
-}
-
-/// Why a fetch did not yield usage data.
-enum FetchError {
-	/// No usable credentials — render a "sign in" hint rather than going blank.
-	NoAuth(String),
-	/// Token rejected — Claude Code likely needs to refresh it.
-	Unauthorized,
-	/// Network/rate-limit/transient error — keep the previous frame.
-	Transient(String),
-}
-
-fn http() -> &'static reqwest::Client {
-	static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-	CLIENT.get_or_init(reqwest::Client::new)
-}
-
-fn read_access_token(path: &str) -> Result<String, FetchError> {
-	let raw = std::fs::read_to_string(path).map_err(|_| FetchError::NoAuth("sign in: claude".to_string()))?;
-	let creds: CredentialsFile = serde_json::from_str(&raw).map_err(|e| FetchError::NoAuth(format!("bad creds: {e}")))?;
-	if creds.oauth.access_token.is_empty() {
-		return Err(FetchError::NoAuth("sign in: claude".to_string()));
-	}
-	Ok(creds.oauth.access_token)
-}
-
-async fn fetch_usage(path: &str) -> Result<UsageReport, FetchError> {
-	let token = read_access_token(path)?;
-
-	let response = http()
-		.get(USAGE_URL)
-		.bearer_auth(&token)
-		.header("User-Agent", USER_AGENT)
-		.header("anthropic-beta", "oauth-2025-04-20")
-		.send()
-		.await
-		.map_err(|e| FetchError::Transient(format!("request failed: {e}")))?;
-
-	match response.status() {
-		s if s.is_success() => response
-			.json::<UsageReport>()
-			.await
-			.map_err(|e| FetchError::Transient(format!("decode failed: {e}"))),
-		reqwest::StatusCode::UNAUTHORIZED | reqwest::StatusCode::FORBIDDEN => Err(FetchError::Unauthorized),
-		reqwest::StatusCode::TOO_MANY_REQUESTS => Err(FetchError::Transient("rate limited".to_string())),
-		other => Err(FetchError::Transient(format!("http {other}"))),
+		self.credentials_path.clone().unwrap_or_else(claude::default_credentials_path)
 	}
 }
 
 // ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
-
-/// Seconds remaining until `resets_at` (never negative).
-fn secs_until(resets_at: Option<DateTime<Utc>>) -> Option<i64> {
-	resets_at.map(|r| (r - Utc::now()).num_seconds().max(0))
-}
-
-/// Time-until-reset rounded UP to the given unit, e.g. `5h` or `2d`.
-fn reset_in(resets_at: Option<DateTime<Utc>>, unit_secs: i64, suffix: char) -> String {
-	match secs_until(resets_at) {
-		Some(s) => {
-			let n = (s + unit_secs - 1) / unit_secs; // ceil division
-			format!("{n}{suffix}")
-		}
-		None => String::new(),
-	}
-}
 
 const CY: f32 = 29.0;
 const R_OUTER: f32 = 27.0;
@@ -183,8 +66,8 @@ fn render_report(report: &UsageReport) -> Result<String, String> {
 
 	// Each group is `LETTER (gauge%) reset`: daily = 5-hour window (reset in
 	// hours), weekly = 7-day window (reset in days).
-	let daily = report.five_hour.as_ref().map(|w| reset_in(w.resets_at, 3_600, 'h')).unwrap_or_default();
-	let weekly = report.seven_day.as_ref().map(|w| reset_in(w.resets_at, 86_400, 'd')).unwrap_or_default();
+	let daily = report.five_hour.as_ref().map(|w| claude::reset_in(w.resets_at, 3_600, 'h')).unwrap_or_default();
+	let weekly = report.seven_day.as_ref().map(|w| claude::reset_in(w.resets_at, 86_400, 'd')).unwrap_or_default();
 
 	let gw = (R_OUTER * 2.0) as i32; // gauge box width
 	let gap = 5;
@@ -227,7 +110,7 @@ fn render_message(title: &str, detail: &str) -> Result<String, String> {
 /// Produce the next frame, mapping fetch outcomes to either an image (Ok) or a
 /// transient error (Err, which keeps the previous frame on screen).
 async fn render_frame(path: &str) -> Result<String, String> {
-	match fetch_usage(path).await {
+	match claude::fetch_usage(path).await {
 		Ok(report) => render_report(&report),
 		Err(FetchError::NoAuth(hint)) => render_message("Claude", &hint),
 		Err(FetchError::Unauthorized) => render_message("Claude", "auth expired"),
@@ -321,31 +204,6 @@ mod tests {
 	}
 
 	#[test]
-	fn parses_credentials() {
-		let raw = r#"{"claudeAiOauth":{"accessToken":"tok","refreshToken":"r","expiresAt":1780968008718}}"#;
-		let creds: CredentialsFile = serde_json::from_str(raw).unwrap();
-		assert_eq!(creds.oauth.access_token, "tok");
-	}
-
-	fn dump_preview(json: &str, path: &str) {
-		use base64::{Engine as _, engine::general_purpose};
-		let report: UsageReport = serde_json::from_str(json).unwrap();
-		let uri = render_report(&report).unwrap();
-		let b64 = uri.strip_prefix("data:image/png;base64,").unwrap();
-		let bytes = general_purpose::STANDARD.decode(b64).unwrap();
-		std::fs::write(path, bytes).unwrap();
-	}
-
-	#[test]
-	#[ignore = "writes preview PNGs to /tmp for visual inspection"]
-	fn write_preview() {
-		dump_preview(SAMPLE, "/tmp/claude_usage_preview.png");
-		let full = r#"{ "five_hour": { "utilization": 100.0, "resets_at": "2026-06-09T23:00:00+00:00" },
-			"seven_day": { "utilization": 100.0, "resets_at": "2026-06-15T00:00:00+00:00" } }"#;
-		dump_preview(full, "/tmp/claude_usage_preview_full.png");
-	}
-
-	#[test]
 	fn percents_fit_inside_gauge() {
 		// Both the big 2-digit size and the smaller "100%" size must fit the
 		// inner circle (diameter = 2 * R_INNER).
@@ -354,19 +212,5 @@ mod tests {
 		let small = text_width("100%", PCT_SIZE_SMALL);
 		assert!(big <= inner_diameter, "99% is {big}px wide but inner circle is {inner_diameter}px");
 		assert!(small <= inner_diameter, "100% is {small}px wide but inner circle is {inner_diameter}px");
-	}
-
-	#[test]
-	fn reset_rounds_up() {
-		assert_eq!(reset_in(None, 3_600, 'h'), "");
-		// 4h40m of hours, rounded up → 5h.
-		let h = Utc::now() + chrono::Duration::minutes(280);
-		assert_eq!(reset_in(Some(h), 3_600, 'h'), "5h");
-		// 16h20m of days, rounded up → 1d.
-		let d = Utc::now() + chrono::Duration::minutes(980);
-		assert_eq!(reset_in(Some(d), 86_400, 'd'), "1d");
-		// 3d4h of days, rounded up → 4d.
-		let d2 = Utc::now() + chrono::Duration::hours(76);
-		assert_eq!(reset_in(Some(d2), 86_400, 'd'), "4d");
 	}
 }

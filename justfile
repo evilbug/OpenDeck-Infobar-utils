@@ -1,4 +1,6 @@
 id := "com.evilbug.infobarutils.sdPlugin"
+# Elgato bundle id; the UUID must prefix the keypad action UUIDs.
+elgato_id := "com.evilbug.infobarclock.sdPlugin"
 
 release: bump package tag
 
@@ -34,6 +36,18 @@ build-win:
     cargo build --release --target x86_64-pc-windows-gnu --target-dir target/plugin-win
 
 package-all: build-linux build-mac build-win collect-all zip
+
+# Build the keypad-only bundle for the official Elgato Stream Deck app (Windows).
+package-elgato: build-win collect-elgato
+
+collect-elgato:
+    rm -rf build-elgato
+    mkdir -p build-elgato/{{elgato_id}}/icons build-elgato/{{elgato_id}}/propertyInspector
+    cp assets/manifest.elgato.json build-elgato/{{elgato_id}}/manifest.json
+    cp assets/icons/claude.png build-elgato/{{elgato_id}}/icons/
+    cp assets/propertyInspector/claude-key.html build-elgato/{{elgato_id}}/propertyInspector/
+    cp assets/propertyInspector/sdpi.css build-elgato/{{elgato_id}}/propertyInspector/
+    cp target/plugin-win/x86_64-pc-windows-gnu/release/opendeck-infobar-utils.exe build-elgato/{{elgato_id}}/opendeck-infobar-utils.exe
 
 collect:
     rm -rf build

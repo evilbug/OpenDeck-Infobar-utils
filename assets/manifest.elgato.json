@@ -1,0 +1,49 @@
+{
+	"$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+	"Name": "Claude Usage Utils",
+	"Description": "Claude subscription usage as circular gauges on a key (daily / weekly).",
+	"Author": "evilbug",
+	"Version": "1.0.0.0",
+	"UUID": "com.evilbug.infobarclock",
+	"Icon": "icons/claude",
+	"CategoryIcon": "icons/claude",
+	"Category": "Claude",
+	"SDKVersion": 2,
+	"Software": {
+		"MinimumVersion": "6.0"
+	},
+	"OS": [
+		{
+			"Platform": "windows",
+			"MinimumVersion": "10"
+		},
+		{
+			"Platform": "mac",
+			"MinimumVersion": "10.15"
+		}
+	],
+	"CodePathWin": "opendeck-infobar-utils.exe",
+	"CodePathMac": "opendeck-infobar-utils-mac",
+	"Actions": [
+		{
+			"Icon": "icons/claude",
+			"Name": "Claude Daily Usage",
+			"States": [{ "Image": "icons/claude" }],
+			"Controllers": ["Keypad"],
+			"SupportedInMultiActions": false,
+			"Tooltip": "Claude 5-hour window as a circular gauge with time-to-reset",
+			"UUID": "com.evilbug.infobarclock.claude.daily",
+			"PropertyInspectorPath": "propertyInspector/claude-key.html"
+		},
+		{
+			"Icon": "icons/claude",
+			"Name": "Claude Weekly Usage",
+			"States": [{ "Image": "icons/claude" }],
+			"Controllers": ["Keypad"],
+			"SupportedInMultiActions": false,
+			"Tooltip": "Claude 7-day window as a circular gauge with time-to-reset",
+			"UUID": "com.evilbug.infobarclock.claude.weekly",
+			"PropertyInspectorPath": "propertyInspector/claude-key.html"
+		}
+	]
+}
